@@ -1,0 +1,305 @@
+=item --format
+
+
+
+This may theoretically be any IO subsytem and the format understood by
+
+that subsystem to parse the input file(s). IO subsytem and format must
+
+be separated by a double colon. See below for which subsystems are
+
+currently supported.
+
+
+
+The default IO subsystem is TreeIO. 'Bio::' will automatically be
+
+prepended if not already present. As of now the other supported
+
+subsystem is ClusterIO. All input files must have the same format.
+
+
+
+
+format used by Bio::TreeIO:
+
+     #newick             Newick tree format
+
+     #nexus              Nexus tree format
+
+     #nhx                NHX tree format
+
+     #svggraph           SVG graphical representation of tree
+
+     #tabtree            ASCII text representation of tree
+
+     #lintree            lintree output format
+
+
+=item --fmtargs
+
+
+
+Use this argument to specify initialization parameters for the parser
+
+for the input format. The argument value is expected to be a string
+
+with parameter names and values delimited by commas.
+
+
+
+Usually you will want to protect the argument list from interpretation
+
+by the shell, so surround it with double or single quotes.
+
+
+
+If a parameter value contains a comma, escape it with a backslash
+
+(which means you also must protect the whole argument from the shell
+
+in order to preserve the backslash)
+
+
+
+Examples:
+
+
+
+    # turn parser exceptions into warnings (don't try this at home)
+
+    --fmtargs "-verbose,-1"
+
+    # verbose parser with an additional path argument
+
+    --fmtargs "-verbose,1,-indexpath,/home/luke/warp"
+
+    # escape commas in values
+
+    --fmtargs "-myspecialchar,\,"
+
+
+
+=item --pipeline
+
+
+
+This is a sequence of Bio::Factory::SeqProcessorI (see
+
+L<Bio::Factory::SeqProcessorI>) implementing objects that will be
+
+instantiated and chained in exactly this order. This allows you to
+
+write re-usable modules for custom post-processing of objects after
+
+the stream parser returns them. See L<Bio::Seq::BaseSeqProcessor> for
+
+a base implementation for such modules.
+
+
+
+Modules are separated by the pipe character '|'. In addition, you can
+
+specify initialization parameters for each of the modules by enclosing
+
+a comma-separated list of alternating parameter name and value pairs
+
+in parentheses or angle brackets directly after the module.
+
+
+
+This option will be ignored if no value is supplied.
+
+
+
+Examples:
+
+    # one module
+
+    --pipeline "My::SeqProc"
+
+    # two modules in the specified order
+
+    --pipeline "My::SeqProc|My::SecondSeqProc"
+
+    # two modules, the first of which has two initialization parameters
+
+    --pipeline "My::SeqProc(-maxlength,1500,-minlength,300)|My::SecondProc"
+
+
+
+=item --seqfilter
+
+
+
+This is either a string or a file defining a closure to be used as
+
+sequence filter. The value is interpreted as a file if it refers to a
+
+readable file, and a string otherwise. See add_condition() in
+
+L<Bio::Seq::SeqBuilder> for more information about what the code will
+
+be used for. The closure will be passed a hash reference with an
+
+accumulated list of initialization paramaters for the prospective
+
+object. It returns TRUE if the object is to be built and FALSE
+
+otherwise.
+
+
+
+Note that this closure operates at the stream parser level. Objects it
+
+rejects will be skipped by the parser. Objects it accepts can still be
+
+intercepted at a later stage (options --remove, --update, --noupdate,
+
+--mergeobjs).
+
+
+
+Note that not necessarily all stream parsers support a
+
+Bio::Factory::ObjectBuilderI (see L<Bio::Factory::ObjectBuilderI>)
+
+object. Email bioperl-l@bioperl.org to find out which ones do. In
+
+fact, at the time of writing this, only Bio::SeqIO::genbank supports
+
+it.
+
+
+
+This option will be ignored if no value is supplied.
+
+
+
+=item --mergeobjs
+
+
+
+This is also a string or a file defining a closure. If provided, the
+
+closure is called if a look-up for the unique key of the new object
+
+was successful. Hence, it will never be called without supplying
+
+--lookup at the same time. 
+
+
+
+Note that --noupdate will B<not> prevent the closure from being
+
+called. I.e., if you make changes to the database in your merge script
+
+as opposed to only modifying the object, --noupdate will B<not>
+
+prevent those changes. This is a feature, not a bug. Obviously,
+
+modifications to the in-memory object will have no effect with
+
+--noupdate since the database won't be updated with it.
+
+
+
+The closure will be passed three arguments: the object found by
+
+lookup, the new object to be submitted, and the Bio::DB::DBAdaptorI
+
+(see L<Bio::DB::DBAdaptorI>) implementing object for the desired
+
+database. If the closure returns a value, it must be the object to be
+
+inserted or updated in the database (if $obj->primary_key returns a
+
+value, the object will be updated). If it returns undef, the script
+
+will skip to the next object in the input stream.
+
+
+
+The purpose of the closure can be manifold. It was originally
+
+conceived as a means to customarily merge attributes or associated
+
+objects of the new object to the existing (found) one in order to
+
+avoid duplications but still capture additional information (e.g.,
+
+annotation). However, there is a multitude of other operations it can
+
+be used for, like physically deleting or altering certain associated
+
+information from the database (the found object and all its associated
+
+objects will implement Bio::DB::PersistentObjectI, see
+
+L<Bio::DB::PersistentObjectI>). Since the third argument is the
+
+persistent object and adaptor factory for the database, there is
+
+literally no limit as to the database operations the closure could
+
+possibly do.
+
+This option will be ignored if no value is supplied.
+
+
+
+=item --logchunk
+
+
+
+If supplied with an integer argument n greater than zero, progress
+
+will be logged to stderr every n entries of the input file(s). Default
+
+is no progress logging.
+
+
+
+=item --debug
+
+
+
+Turn on verbose and debugging mode. This will produce a *lot* of
+
+logging output, hence you will want to capture the output in a
+
+file. This option is useful if you get some mysterious failure
+
+somewhere in the events of loading or updating a record, and you would
+
+like to see, e.g., precisely which SQL statement fails. Usually you
+
+turn on this option because you've been asked to do so by a person
+
+responding after you posted your problem to the Bioperl mailing list.
+
+
+
+=item -u, -z, or --uncompress
+
+
+
+Uncompress the input file(s) on-the-fly by piping them through
+
+gunzip. Gunzip must be in your path for this option to work.
+
+
+
+=item more args
+
+
+
+The remaining arguments will be treated as files to parse and load. If
+
+there are no additional arguments, input is expected to come from
+
+standard input.
+
+
+
+=back
